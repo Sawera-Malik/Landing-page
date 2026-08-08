@@ -11,7 +11,7 @@ function Main() {
   return (
     <div className="page">
       <header className="navbar">
-        <img src={logo} style={{height: "120px"}} />
+        <img src={logo} alt="Logo" style={{height: "120px"}} />
         <nav className="menu">
           <a href="#home" className={active === 'home' ? 'active' : ''} onClick={() => setActive('home')}>Home</a>
           <a href="#about" className={active === 'about' ? 'active' : ''} onClick={() => setActive('about')}>About</a>
@@ -100,7 +100,7 @@ function PillDropdown({ items = [], icon = null }) {
 
   return (
     <div className="pill-dropdown" ref={ref}>
-      <button className="pill-button" onClick={() => setOpen(v => !v)} aria-expanded={open}>
+      <button type="button" className="pill-button" onClick={() => setOpen(v => !v)} aria-expanded={open}>
         <span className="pill-icon">{icon}</span>
         <span className="pill-label">{selected}</span>
         <span className="pill-chevron">▾</span>
@@ -124,34 +124,56 @@ function useHeroSpotlight(heroRef) {
     const el = heroRef.current;
     if (!el) return;
 
+    let frameId = 0;
+    let nextX = -200;
+    let nextY = -200;
+
+    function updateSpotlight() {
+      frameId = 0;
+      el.style.setProperty('--mx', `${nextX}%`);
+      el.style.setProperty('--my', `${nextY}%`);
+    }
+
     function onMove(e) {
       const rect = el.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const point = e.touches ? e.touches[0] : e;
+      const x = point.clientX - rect.left;
+      const y = point.clientY - rect.top;
       const xp = (x / rect.width) * 100;
       const yp = (y / rect.height) * 100;
-      el.style.setProperty('--mx', `${xp}%`);
-      el.style.setProperty('--my', `${yp}%`);
+      nextX = xp;
+      nextY = yp;
+
+      if (!frameId) {
+        frameId = window.requestAnimationFrame(updateSpotlight);
+      }
     }
 
     function onLeave() {
-      // move mask off-screen so hero stays blurred
-      el.style.setProperty('--mx', `-200%`);
-      el.style.setProperty('--my', `-200%`);
+      nextX = -200;
+      nextY = -200;
+
+      if (!frameId) {
+        frameId = window.requestAnimationFrame(updateSpotlight);
+      }
     }
 
-    el.addEventListener('mousemove', onMove);
+    el.addEventListener('pointermove', onMove, { passive: true });
     el.addEventListener('mouseleave', onLeave);
-    el.addEventListener('touchstart', onMove);
-    el.addEventListener('touchmove', onMove);
-    el.addEventListener('touchend', onLeave);
+    el.addEventListener('pointerdown', onMove, { passive: true });
+    el.addEventListener('pointerup', onLeave, { passive: true });
+    el.addEventListener('pointercancel', onLeave, { passive: true });
 
     return () => {
-      el.removeEventListener('mousemove', onMove);
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      el.removeEventListener('pointermove', onMove);
       el.removeEventListener('mouseleave', onLeave);
-      el.removeEventListener('touchstart', onMove);
-      el.removeEventListener('touchmove', onMove);
-      el.removeEventListener('touchend', onLeave);
+      el.removeEventListener('pointerdown', onMove);
+      el.removeEventListener('pointerup', onLeave);
+      el.removeEventListener('pointercancel', onLeave);
     };
   }, [heroRef]);
 }
